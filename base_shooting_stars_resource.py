@@ -56,6 +56,8 @@ def hook_validate_data(req: falcon.request.Request, resp: falcon.response.Respon
             raise falcon.HTTPBadRequest(title='Bad request', description=msg)
         if max_time > 60*150 + int(time.time()):
             raise falcon.HTTPBadRequest(title='Bad request', description=msg)
+        if max_time < int(time.time()):
+            raise falcon.HTTPBadRequest(title='Bad request', description=msg)
 
 
 def hook_validate_auth(req: falcon.request.Request, resp: falcon.response.Response, resource, params):
@@ -137,7 +139,7 @@ class BaseShootingStarsResource:
             min_time = data_obj['minTime']
             # Get most recent insert
             row = self.conn.execute("""
-                SELECT location, world, minTime, maxTime
+                SELECT ROWID, location, world, minTime, maxTime
                 FROM data
                 WHERE world = ? AND maxTime > ? AND sharedKey = ? ORDER BY ROWID DESC
             """, [world, min_time - 60*10, authorization]).fetchone()

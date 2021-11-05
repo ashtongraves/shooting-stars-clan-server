@@ -1,10 +1,10 @@
 import json
+import sqlite3
 import time
 
 import falcon
-from base_shooting_stars_resource import BaseShootingStarsResource
+from base_shooting_stars_resource import BaseShootingStarsResource, hook_validate_auth
 from constants import ERROR_MSG_AUTHORIZATION_FAIL_SUBMIT, ERROR_MSG_DATA_VALIDATION_FAIL
-
 
 master_pw_whitelist = set()
 scout_pw_whitelist = set()
@@ -12,7 +12,7 @@ scout_pw_whitelist = set()
 
 def hook_validate_scout_password(req: falcon.request.Request, resp: falcon.response.Response, resource, params):
     authorization = req.auth
-    if authorization not in scout_pw_whitelist:
+    if authorization not in scout_pw_whitelist and authorization not in master_pw_whitelist:
         msg = ERROR_MSG_AUTHORIZATION_FAIL_SUBMIT
         raise falcon.HTTPBadRequest(title='Bad request', description=msg)
 
@@ -32,7 +32,7 @@ def hook_validate_whitelist_params(req: falcon.request.Request, resp: falcon.res
 
 class PasswordStarMinersResource:
 
-    def __init__(self, path_to_db: str):
+    def __init__(self, path_to_db: sqlite3.Connection):
         self.shooting_stars_resource = BaseShootingStarsResource(path_to_db)
 
     @falcon.before(hook_validate_master_password)
@@ -66,22 +66,22 @@ class PasswordStarMinersResource:
     def on_post(self, req: falcon.request.Request, resp: falcon.response.Response):
         return self.shooting_stars_resource.on_post(req, resp)
 
+    @falcon.before(hook_validate_auth)
     def on_get(self, req: falcon.request.Request, resp: falcon.response.Response):
         """Handles GET requests"""
         resp.status = falcon.HTTP_200  # This is the default status
-        authorization = req.auth
 
         # Get all current worlds for all keys.
         lowest_time = int(time.time()) - (60*60)
         highest_time = int(time.time()) + (60*150)
         rows = self.shooting_stars_resource.conn.execute("""
-            SELECT location, world, MAX(minTime), MIN(maxTime)
+            SELECT location, world, MAX(minTime) as minTime, MIN(maxTime) as maxTime
             FROM data
             WHERE
                 maxTime > ? AND maxTime < ?
-            ORDER BY maxTime
             GROUP BY location, world
-        """, [authorization, lowest_time, highest_time]).fetchall()
+            ORDER BY maxTime
+        """, [lowest_time, highest_time]).fetchall()
 
         # Put data in json format
         data_blob = []
