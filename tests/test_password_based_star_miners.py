@@ -124,7 +124,7 @@ class TestPasswordShootingStarsResourceGet(TestCase):
         resp: falcon.testing.Result = self.app.simulate_get('/shooting_stars', headers={'Authorization': 'global'})
         assert resp.status == falcon.HTTP_200
         assert len(resp.json) == 1
-        data = resp.json[0]
+        data: dict = resp.json[0]
         assert data['location'] == 10
         assert data['world'] == 302
         assert data['minTime'] == FROZEN_UNIX_TIME
