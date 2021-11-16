@@ -26,9 +26,12 @@ def create_test_app(conn: sqlite3.Connection):
     # Resources are represented by long-lived class instances
     shooting_stars_resource = PasswordStarMinersResource(conn)
     password_based_star_miners.scout_pw_whitelist.add('testpw')
+    password_based_star_miners.scout_pw_whitelist.add('testpw2')
     password_based_star_miners.master_pw_whitelist.add('masterpw')
 
     app.add_route('/shooting_stars', shooting_stars_resource)
+    app.add_route('/audit', shooting_stars_resource, suffix='separate')
+    app.add_route('/whitelist', shooting_stars_resource, suffix='whitelist')
     return app, shooting_stars_resource
 
 
@@ -190,6 +193,7 @@ class TestPasswordShootingStarsResourceGet(TestCase):
         resp: falcon.testing.Result = self.app.simulate_get('/shooting_stars', headers={'Authorization': 'a1b2c3d4'})
         assert resp.status == falcon.HTTP_400
         assert resp.json == {'title': 'Bad request', 'description': ERROR_MSG_AUTHORIZATION_FAIL}
+
 
 @freeze_time(FROZEN_TIME)
 class TestShootingStarsResourcePost(TestCase):
@@ -378,6 +382,7 @@ class TestShootingStarsResourcePost(TestCase):
     def test_validation_fail_non_alpha_auth(self):
         password_based_star_miners.scout_pw_whitelist.add('123456')
         resp = self.app.simulate_post('/shooting_stars', headers={'Authorization': '123456'})
+        password_based_star_miners.scout_pw_whitelist.remove('123456')
         assert resp.status == falcon.HTTP_400
         assert resp.json == {'title': 'Bad request', 'description': ERROR_MSG_AUTHORIZATION_FAIL}
         assert self.conn.execute('''SELECT * FROM data''').fetchall() == []
@@ -385,6 +390,7 @@ class TestShootingStarsResourcePost(TestCase):
     def test_validation_fail_alpha_numeric_auth(self):
         password_based_star_miners.scout_pw_whitelist.add('a1b2c3d4')
         resp = self.app.simulate_post('/shooting_stars', headers={'Authorization': 'a1b2c3d4'})
+        password_based_star_miners.scout_pw_whitelist.remove('a1b2c3d4')
         assert resp.status == falcon.HTTP_400
         assert resp.json == {'title': 'Bad request', 'description': ERROR_MSG_AUTHORIZATION_FAIL}
         assert self.conn.execute('''SELECT * FROM data''').fetchall() == []
@@ -608,3 +614,298 @@ class TestShootingStarsResourcePost(TestCase):
         assert resp.status == falcon.HTTP_400
         assert resp.json == {'title': 'Bad request', 'description': ERROR_MSG_DATA_VALIDATION_FAIL}
         assert self.conn.execute('''SELECT * FROM data''').fetchall() == []
+
+
+@freeze_time(FROZEN_TIME)
+class TestPasswordShootingStarsResourceGetSeparate(TestCase):
+
+    def test_simple(self):
+        test_data = {
+            'location': 10,
+            'world': 302,
+            'minTime': FROZEN_UNIX_TIME - 100,
+            'maxTime': FROZEN_UNIX_TIME + 100
+        }
+        add_data(self.conn, test_data, 'testpw')
+
+        resp: falcon.testing.Result = self.app.simulate_get('/audit', headers={'Authorization': 'masterpw'})
+        correct_response = test_data.copy()
+        correct_response['password'] = 'testpw'
+        assert resp.status == falcon.HTTP_200
+        assert resp.json == [correct_response]
+
+    def test_multiple_data_points(self):
+        test_data = {
+            'location': 10,
+            'world': 302,
+            'minTime': FROZEN_UNIX_TIME - 100,
+            'maxTime': FROZEN_UNIX_TIME + 100
+        }
+        test_data_2 = test_data.copy()
+        test_data_2['world'] = 304
+        add_data(self.conn, test_data, 'testpw')
+        add_data(self.conn, test_data_2, 'testpw')
+
+        resp: falcon.testing.Result = self.app.simulate_get('/audit', headers={'Authorization': 'masterpw'})
+        correct_response_1 = test_data.copy()
+        correct_response_1['password'] = 'testpw'
+        correct_response_2 = test_data_2.copy()
+        correct_response_2['password'] = 'testpw'
+        assert resp.status == falcon.HTTP_200
+        assert len(resp.json) == 2
+        assert correct_response_1 in resp.json
+        assert correct_response_2 in resp.json
+
+    def test_multiple_data_points_diff_keys(self):
+        test_data = {
+            'location': 10,
+            'world': 302,
+            'minTime': FROZEN_UNIX_TIME - 100,
+            'maxTime': FROZEN_UNIX_TIME + 100
+        }
+        test_data_2 = test_data.copy()
+        test_data_2['world'] = 304
+        add_data(self.conn, test_data, 'testpw')
+        add_data(self.conn, test_data_2, 'testpw2')
+
+        resp: falcon.testing.Result = self.app.simulate_get('/audit', headers={'Authorization': 'masterpw'})
+        assert resp.status == falcon.HTTP_200
+        assert len(resp.json) == 2
+        test_data_with_key = test_data.copy()
+        test_data_with_key['password'] = 'testpw'
+        test_data_with_key_2 = test_data_2.copy()
+        test_data_with_key_2['password'] = 'testpw2'
+        assert test_data_with_key in resp.json
+        assert test_data_with_key_2 in resp.json
+
+    def test_multiple_data_points_diff_keys_same_world(self):
+        test_data = {
+            'location': 10,
+            'world': 302,
+            'minTime': FROZEN_UNIX_TIME - 100,
+            'maxTime': FROZEN_UNIX_TIME + 100
+        }
+        test_data_2 = test_data.copy()
+        test_data_2['minTime'] = FROZEN_UNIX_TIME
+        test_data_2['maxTime'] = FROZEN_UNIX_TIME + 200
+        add_data(self.conn, test_data, 'testpw')
+        add_data(self.conn, test_data_2, 'testpw2')
+
+        resp: falcon.testing.Result = self.app.simulate_get('/audit', headers={'Authorization': 'masterpw'})
+        assert resp.status == falcon.HTTP_200
+        assert len(resp.json) == 2
+        test_data_with_key = test_data.copy()
+        test_data_with_key['password'] = 'testpw'
+        test_data_with_key_2 = test_data_2.copy()
+        test_data_with_key_2['password'] = 'testpw2'
+        assert test_data_with_key in resp.json
+        assert test_data_with_key_2 in resp.json
+
+    def test_out_of_range(self):
+        test_data = {
+            'location': 10,
+            'world': 302,
+            'minTime': FROZEN_UNIX_TIME - (100 + (60*60)),
+            'maxTime': FROZEN_UNIX_TIME - (60*60)
+        }
+        add_data(self.conn, test_data, 'testpw')
+
+        resp: falcon.testing.Result = self.app.simulate_get('/audit', headers={'Authorization': 'masterpw'})
+        assert resp.status == falcon.HTTP_200
+        assert resp.json == []
+
+    def test_edge_of_range(self):
+        test_data = {
+            'location': 10,
+            'world': 302,
+            'minTime': FROZEN_UNIX_TIME - (100 + (60*60)),
+            'maxTime': FROZEN_UNIX_TIME - (60*60) + 1
+        }
+        add_data(self.conn, test_data, 'testpw')
+
+        resp: falcon.testing.Result = self.app.simulate_get('/audit', headers={'Authorization': 'masterpw'})
+        assert resp.status == falcon.HTTP_200
+        assert len(resp.json) == 1
+        data: dict = resp.json[0]
+        assert data['location'] == 10
+        assert data['world'] == 302
+        assert data['minTime'] == FROZEN_UNIX_TIME - (100 + (60*60))
+        assert data['maxTime'] == FROZEN_UNIX_TIME - (60*60) + 1
+
+    def test_simple_with_old_data(self):
+        test_data = {
+            'location': 10,
+            'world': 302,
+            'minTime': FROZEN_UNIX_TIME - (100 + (60*60)),
+            'maxTime': FROZEN_UNIX_TIME - (50 + (60*60))
+        }
+        test_data_2 = {
+            'location': 8,
+            'world': 302,
+            'minTime': FROZEN_UNIX_TIME + 100,
+            'maxTime': FROZEN_UNIX_TIME + 1000
+        }
+        add_data(self.conn, test_data, 'testpw')
+        add_data(self.conn, test_data_2, 'testpw')
+
+        resp: falcon.testing.Result = self.app.simulate_get('/audit', headers={'Authorization': 'masterpw'})
+        assert resp.status == falcon.HTTP_200
+        test_data_2_with_key = test_data_2.copy()
+        test_data_2_with_key['password'] = 'testpw'
+        assert resp.json == [test_data_2_with_key]
+
+    def test_validation_fail_no_auth(self):
+        resp: falcon.testing.Result = self.app.simulate_get('/audit')
+        assert resp.status == falcon.HTTP_400
+        assert resp.json == {'title': 'Bad request', 'description': ERROR_MSG_AUTHORIZATION_FAIL_SUBMIT}
+
+    def test_validation_allow_non_alpha_auth(self):
+        password_based_star_miners.master_pw_whitelist.add('123456')
+        resp: falcon.testing.Result = self.app.simulate_get('/audit', headers={'Authorization': '123456'})
+        password_based_star_miners.master_pw_whitelist.remove('123456')
+        assert resp.status == falcon.HTTP_200
+
+    def test_validation_allow_alpha_numeric_auth(self):
+        password_based_star_miners.master_pw_whitelist.add('a1b2c3d4')
+        resp: falcon.testing.Result = self.app.simulate_get('/audit', headers={'Authorization': 'a1b2c3d4'})
+        password_based_star_miners.master_pw_whitelist.remove('a1b2c3d4')
+        assert resp.status == falcon.HTTP_200
+
+
+class TestPasswordShootingStarsResourceGetWhitelist(TestCase):
+
+    def test_simple(self):
+        resp: falcon.testing.Result = self.app.simulate_get('/whitelist', headers={'Authorization': 'masterpw'})
+        assert resp.status == falcon.HTTP_200
+        assert len(resp.json) == 2
+        assert 'testpw' in resp.json
+        assert 'testpw2' in resp.json
+
+    def test_master_password_not_returned(self):
+        password_based_star_miners.master_pw_whitelist.add('masterpw')
+        resp: falcon.testing.Result = self.app.simulate_get('/whitelist', headers={'Authorization': 'masterpw'})
+        assert resp.status == falcon.HTTP_200
+        assert len(resp.json) == 2
+        assert 'testpw' in resp.json
+        assert 'testpw2' in resp.json
+        assert 'masterpw' not in resp.json
+        password_based_star_miners.master_pw_whitelist.remove('masterpw')
+
+    def test_validation_no_auth(self):
+        resp: falcon.testing.Result = self.app.simulate_get('/whitelist')
+        assert resp.status == falcon.HTTP_400
+        assert resp.json == {'title': 'Bad request', 'description': ERROR_MSG_AUTHORIZATION_FAIL_SUBMIT}
+
+    def test_validation_incorrect_auth(self):
+        resp: falcon.testing.Result = self.app.simulate_get('/whitelist', headers={'Authorization': 'badpw'})
+        assert resp.status == falcon.HTTP_400
+        assert resp.json == {'title': 'Bad request', 'description': ERROR_MSG_AUTHORIZATION_FAIL_SUBMIT}
+
+
+class TestPasswordShootingStarsResourcePostWhitelist(TestCase):
+    # add something already on the list
+    # add a new pw
+    def test_simple(self):
+        resp: falcon.testing.Result = self.app.simulate_post('/whitelist', headers={'Authorization': 'masterpw'}, json=json.dumps({'password': 'testpw3'}))
+        assert resp.status == falcon.HTTP_200
+        assert 'testpw3' in password_based_star_miners.scout_pw_whitelist
+        assert 'testpw3' not in password_based_star_miners.master_pw_whitelist
+        password_based_star_miners.scout_pw_whitelist.discard('testpw3')
+
+    def test_already_existing_add(self):
+        password_based_star_miners.scout_pw_whitelist.add('testpw3')
+        resp: falcon.testing.Result = self.app.simulate_post('/whitelist', headers={'Authorization': 'masterpw'}, json=json.dumps({'password': 'testpw3'}))
+        assert resp.status == falcon.HTTP_200
+        assert 'testpw3' in password_based_star_miners.scout_pw_whitelist
+        assert 'testpw3' not in password_based_star_miners.master_pw_whitelist
+        password_based_star_miners.scout_pw_whitelist.discard('testpw3')
+
+    def test_validation_no_auth(self):
+        resp: falcon.testing.Result = self.app.simulate_post('/whitelist', json=json.dumps({'password': 'testpw3'}))
+        assert resp.status == falcon.HTTP_400
+        assert resp.json == {'title': 'Bad request', 'description': ERROR_MSG_AUTHORIZATION_FAIL_SUBMIT}
+
+    def test_validation_incorrect_auth(self):
+        resp: falcon.testing.Result = self.app.simulate_post('/whitelist', headers={'Authorization': 'badpw'}, json=json.dumps({'password': 'testpw3'}))
+        assert resp.status == falcon.HTTP_400
+        assert resp.json == {'title': 'Bad request', 'description': ERROR_MSG_AUTHORIZATION_FAIL_SUBMIT}
+
+    def test_validation_fail_not_json(self):
+        resp = self.app.simulate_post('/whitelist', body='', headers={'Authorization': 'masterpw'})
+        assert resp.status == falcon.HTTP_400
+        assert resp.json == {'title': 'Bad request', 'description': ERROR_MSG_DATA_VALIDATION_FAIL}
+
+    def test_validation_fail_missing_password(self):
+        resp = self.app.simulate_post('/whitelist', body='{}', headers={'Authorization': 'masterpw'})
+        assert resp.status == falcon.HTTP_400
+        assert resp.json == {'title': 'Bad request', 'description': ERROR_MSG_DATA_VALIDATION_FAIL}
+
+    def test_validation_fail_password_not_str(self):
+        resp = self.app.simulate_post('/whitelist', body='{"password": 1}', headers={'Authorization': 'masterpw'})
+        assert resp.status == falcon.HTTP_400
+        assert resp.json == {'title': 'Bad request', 'description': ERROR_MSG_DATA_VALIDATION_FAIL}
+
+
+class TestPasswordShootingStarsResourceDeleteWhitelist(TestCase):
+
+    def test_simple(self):
+        resp: falcon.testing.Result = self.app.simulate_delete('/whitelist', headers={'Authorization': 'masterpw'}, json=json.dumps({'password': 'testpw2'}))
+
+        assert resp.status == falcon.HTTP_200
+        assert 'testpw2' not in password_based_star_miners.scout_pw_whitelist
+        assert 'testpw' in password_based_star_miners.scout_pw_whitelist
+        assert resp.text == 'Successfully removed from whitelist and data cleared'
+
+        password_based_star_miners.scout_pw_whitelist.add('testpw2')
+
+    def test_remove_data(self):
+        test_data = {
+            'location': 10,
+            'world': 302,
+            'minTime': FROZEN_UNIX_TIME - 100,
+            'maxTime': FROZEN_UNIX_TIME + 100
+        }
+        add_data(self.conn, test_data, 'testpw2')
+        resp: falcon.testing.Result = self.app.simulate_delete('/whitelist', headers={'Authorization': 'masterpw'}, json=json.dumps({'password': 'testpw2'}))
+
+        assert resp.status == falcon.HTTP_200
+        assert 'testpw2' not in password_based_star_miners.scout_pw_whitelist
+        assert 'testpw' in password_based_star_miners.scout_pw_whitelist
+        assert resp.text == 'Successfully removed from whitelist and data cleared'
+        rows = self.conn.execute('''SELECT * FROM data''').fetchall()
+        assert len(rows) == 0
+
+        password_based_star_miners.scout_pw_whitelist.add('testpw2')
+
+    def test_not_in_whitelist(self):
+        resp: falcon.testing.Result = self.app.simulate_delete('/whitelist', headers={'Authorization': 'masterpw'}, json=json.dumps({'password': 'testpw3'}))
+
+        assert resp.status == falcon.HTTP_200
+        assert 'testpw2' in password_based_star_miners.scout_pw_whitelist
+        assert 'testpw' in password_based_star_miners.scout_pw_whitelist
+        assert resp.text == 'No such key found in the whitelist'
+
+    def test_validation_no_auth(self):
+        resp: falcon.testing.Result = self.app.simulate_delete('/whitelist', json=json.dumps({'password': 'testpw2'}))
+        assert resp.status == falcon.HTTP_400
+        assert resp.json == {'title': 'Bad request', 'description': ERROR_MSG_AUTHORIZATION_FAIL_SUBMIT}
+
+    def test_validation_incorrect_auth(self):
+        resp: falcon.testing.Result = self.app.simulate_delete('/whitelist', headers={'Authorization': 'badpw'}, json=json.dumps({'password': 'testpw2'}))
+        assert resp.status == falcon.HTTP_400
+        assert resp.json == {'title': 'Bad request', 'description': ERROR_MSG_AUTHORIZATION_FAIL_SUBMIT}
+
+    def test_validation_fail_not_json(self):
+        resp = self.app.simulate_delete('/whitelist', body='', headers={'Authorization': 'masterpw'})
+        assert resp.status == falcon.HTTP_400
+        assert resp.json == {'title': 'Bad request', 'description': ERROR_MSG_DATA_VALIDATION_FAIL}
+
+    def test_validation_fail_missing_password(self):
+        resp = self.app.simulate_delete('/whitelist', body='{}', headers={'Authorization': 'masterpw'})
+        assert resp.status == falcon.HTTP_400
+        assert resp.json == {'title': 'Bad request', 'description': ERROR_MSG_DATA_VALIDATION_FAIL}
+
+    def test_validation_fail_password_not_str(self):
+        resp = self.app.simulate_delete('/whitelist', body='{"password": 1}', headers={'Authorization': 'masterpw'})
+        assert resp.status == falcon.HTTP_400
+        assert resp.json == {'title': 'Bad request', 'description': ERROR_MSG_DATA_VALIDATION_FAIL}
