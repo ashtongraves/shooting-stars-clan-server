@@ -1,3 +1,4 @@
+import os
 import sqlite3
 
 import falcon
@@ -31,7 +32,7 @@ def create_test_app(conn: sqlite3.Connection):
     app.add_route('/shooting_stars', shooting_stars_resource)
     app.add_route('/audit', shooting_stars_resource, suffix='separate')
     app.add_route('/whitelist', shooting_stars_resource, suffix='whitelist')
-    app.add_static_route('/portal', '/Volumes/USB STICK/shooting_stars_server/static')
+    app.add_static_route('/portal', os.environ['STATIC_ASSETS_FOLDER'])
     return app, shooting_stars_resource
 
 
