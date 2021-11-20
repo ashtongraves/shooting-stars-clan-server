@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+<body>
+
+<label for="passwordbox">Your password:</label>
+<input id="passwordbox" type="text" />
+<h3>Add or remove a key</h3>
+<input id="keytochange" type="text" />
+<button type="button" id="addbutton">Add to whitelist</button>
+<button type="button" id="removebutton">Remove from whitelist</button>
+<h2>Audit results</h2>
+<button type="button" id="auditbutton">Update audit results</button>
+<div id="auditresults">
+</div>
+
+<script>
+    function addtowhitelist() {
+        var text = document.getElementById("keytochange").value;
+        var mypass = document.getElementById("passwordbox").value;
+        if (text === "" || mypass === "")
+            return;
+        var xmlhttp = new XMLHttpRequest();
+        xmlhttp.open("POST", "http://localhost:8000/whitelist", false);
+        xmlhttp.setRequestHeader("Content-Type", "application/json");
+        xmlhttp.setRequestHeader("Authorization", mypass);
+        xmlhttp.send(JSON.stringify({"password": text}));
+    }
+    function removefromwhitelist() {
+        var text = document.getElementById("keytochange").value;
+        var mypass = document.getElementById("passwordbox").value;
+        if (text === "" || mypass === "")
+            return;
+        var xmlhttp = new XMLHttpRequest();
+        xmlhttp.open("DELETE", "http://localhost:8000/whitelist", false);
+        xmlhttp.setRequestHeader("Content-Type", "application/json");
+        xmlhttp.setRequestHeader("Authorization", mypass);
+        xmlhttp.send(JSON.stringify({"password": text}));
+    }
+    function getauditlist() {
+        var mypass = document.getElementById("passwordbox").value;
+        if (mypass === "")
+            return;
+        var xmlhttp = new XMLHttpRequest();
+        xmlhttp.open("GET", "http://localhost:8000/audit", false);
+        xmlhttp.setRequestHeader("Authorization", mypass);
+        xmlhttp.onreadystatechange = function() {
+            if (xmlhttp.readyState === XMLHttpRequest.DONE) {
+                document.getElementById("auditresults").innerHTML = (xmlhttp.responseText);
+            }
+        }
+        xmlhttp.send(null);
+    }
+
+    document.getElementById("addbutton").onclick = addtowhitelist;
+    document.getElementById("removebutton").onclick = removefromwhitelist;
+    document.getElementById("auditbutton").onclick = getauditlist;
+</script>
+</body>
+</html>
