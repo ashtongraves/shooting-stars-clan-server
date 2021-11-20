@@ -14,13 +14,14 @@
 </div>
 
 <script>
+    let base_url = "https://z9smj03u77.execute-api.us-east-1.amazonaws.com/"
     function addtowhitelist() {
         var text = document.getElementById("keytochange").value;
         var mypass = document.getElementById("passwordbox").value;
         if (text === "" || mypass === "")
             return;
         var xmlhttp = new XMLHttpRequest();
-        xmlhttp.open("POST", "http://localhost:8000/whitelist", false);
+        xmlhttp.open("POST", base_url + "whitelist", false);
         xmlhttp.setRequestHeader("Content-Type", "application/json");
         xmlhttp.setRequestHeader("Authorization", mypass);
         xmlhttp.send(JSON.stringify({"password": text}));
@@ -31,7 +32,7 @@
         if (text === "" || mypass === "")
             return;
         var xmlhttp = new XMLHttpRequest();
-        xmlhttp.open("DELETE", "http://localhost:8000/whitelist", false);
+        xmlhttp.open("DELETE", base_url + "whitelist", false);
         xmlhttp.setRequestHeader("Content-Type", "application/json");
         xmlhttp.setRequestHeader("Authorization", mypass);
         xmlhttp.send(JSON.stringify({"password": text}));
@@ -41,7 +42,7 @@
         if (mypass === "")
             return;
         var xmlhttp = new XMLHttpRequest();
-        xmlhttp.open("GET", "http://localhost:8000/audit", false);
+        xmlhttp.open("GET", base_url + "audit", false);
         xmlhttp.setRequestHeader("Authorization", mypass);
         xmlhttp.onreadystatechange = function() {
             if (xmlhttp.readyState === XMLHttpRequest.DONE) {
