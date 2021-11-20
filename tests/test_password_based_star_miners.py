@@ -1,4 +1,3 @@
-import json
 import sqlite3
 
 import falcon
@@ -32,6 +31,7 @@ def create_test_app(conn: sqlite3.Connection):
     app.add_route('/shooting_stars', shooting_stars_resource)
     app.add_route('/audit', shooting_stars_resource, suffix='separate')
     app.add_route('/whitelist', shooting_stars_resource, suffix='whitelist')
+    app.add_static_route('/portal', '/Volumes/USB STICK/shooting_stars_server/static')
     return app, shooting_stars_resource
 
 
@@ -45,9 +45,10 @@ def add_data(connection, star_data: dict, shared_key: str):
 
 
 class TestCase(testing.TestCase):
+
     def setUp(self):
         super(TestCase, self).setUp()
-        self.conn = setup_db.create_shared_key_db(PATH_TO_TEST_DB)
+        self.conn = setup_db.create_shared_key_db(PATH_TO_TEST_DB, create_whitelists=True)
         self.conn.row_factory = sqlite3.Row
         app, self.shooting_stars_resource = create_test_app(self.conn)
         self.app = testing.TestClient(app)
@@ -199,11 +200,11 @@ class TestPasswordShootingStarsResourceGet(TestCase):
 class TestShootingStarsResourcePost(TestCase):
 
     def test_empty_list(self):
-        resp = self.app.simulate_post('/shooting_stars', json='[]', headers={'Authorization': 'testpw'})
+        resp = self.app.simulate_post('/shooting_stars', json=[], headers={'Authorization': 'testpw'})
         assert resp.status == falcon.HTTP_200
 
     def test_empty_list_master_pw(self):
-        resp = self.app.simulate_post('/shooting_stars', json='[]', headers={'Authorization': 'masterpw'})
+        resp = self.app.simulate_post('/shooting_stars', json=[], headers={'Authorization': 'masterpw'})
         assert resp.status == falcon.HTTP_200
 
     def test_single(self):
@@ -214,7 +215,7 @@ class TestShootingStarsResourcePost(TestCase):
             'maxTime': FROZEN_UNIX_TIME + 1000
         }
 
-        resp = self.app.simulate_post('/shooting_stars', json=json.dumps([test_data]), headers={'Authorization': 'testpw'})
+        resp = self.app.simulate_post('/shooting_stars', json=[test_data], headers={'Authorization': 'testpw'})
         assert resp.status == falcon.HTTP_200
 
         rows = self.conn.execute('''SELECT * FROM data''').fetchall()
@@ -239,7 +240,7 @@ class TestShootingStarsResourcePost(TestCase):
             'maxTime': FROZEN_UNIX_TIME + 1000
         }
         data = [test_data, test_data_2]
-        resp = self.app.simulate_post('/shooting_stars', json=json.dumps(data), headers={'Authorization': 'testpw'})
+        resp = self.app.simulate_post('/shooting_stars', json=data, headers={'Authorization': 'testpw'})
         assert resp.status == falcon.HTTP_200
 
         rows = self.conn.execute('''SELECT * FROM data''').fetchall()
@@ -273,7 +274,7 @@ class TestShootingStarsResourcePost(TestCase):
             'maxTime': FROZEN_UNIX_TIME + 1100
         }
         data = [test_data, test_data_2]
-        resp = self.app.simulate_post('/shooting_stars', json=json.dumps(data), headers={'Authorization': 'testpw'})
+        resp = self.app.simulate_post('/shooting_stars', json=data, headers={'Authorization': 'testpw'})
         assert resp.status == falcon.HTTP_200
 
         rows = self.conn.execute('''SELECT * FROM data''').fetchall()
@@ -298,7 +299,7 @@ class TestShootingStarsResourcePost(TestCase):
             'minTime': FROZEN_UNIX_TIME + 600,
             'maxTime': FROZEN_UNIX_TIME + 1100
         }
-        resp = self.app.simulate_post('/shooting_stars', json=json.dumps([test_data_2]), headers={'Authorization': 'testpw'})
+        resp = self.app.simulate_post('/shooting_stars', json=[test_data_2], headers={'Authorization': 'testpw'})
         assert resp.status == falcon.HTTP_200
 
         rows = self.conn.execute('''SELECT * FROM data''').fetchall()
@@ -324,7 +325,7 @@ class TestShootingStarsResourcePost(TestCase):
             'minTime': FROZEN_UNIX_TIME + (60*10) - 1,
             'maxTime': FROZEN_UNIX_TIME + (60*20)
         }
-        resp = self.app.simulate_post('/shooting_stars', json=json.dumps([test_data_2]), headers={'Authorization': 'testpw'})
+        resp = self.app.simulate_post('/shooting_stars', json=[test_data_2], headers={'Authorization': 'testpw'})
         assert resp.status == falcon.HTTP_200
 
         rows = self.conn.execute('''SELECT * FROM data''').fetchall()
@@ -350,7 +351,7 @@ class TestShootingStarsResourcePost(TestCase):
             'minTime': FROZEN_UNIX_TIME + (60*10),
             'maxTime': FROZEN_UNIX_TIME + (60*20)
         }
-        resp = self.app.simulate_post('/shooting_stars', json=json.dumps([test_data_2]), headers={'Authorization': 'testpw'})
+        resp = self.app.simulate_post('/shooting_stars', json=[test_data_2], headers={'Authorization': 'testpw'})
         assert resp.status == falcon.HTTP_200
 
         rows = self.conn.execute('''SELECT * FROM data''').fetchall()
@@ -395,26 +396,14 @@ class TestShootingStarsResourcePost(TestCase):
         assert resp.json == {'title': 'Bad request', 'description': ERROR_MSG_AUTHORIZATION_FAIL}
         assert self.conn.execute('''SELECT * FROM data''').fetchall() == []
 
-    def test_validation_fail_not_json(self):
-        resp = self.app.simulate_post('/shooting_stars', body='', headers={'Authorization': 'testpw'})
-        assert resp.status == falcon.HTTP_400
-        assert resp.json == {'title': 'Bad request', 'description': ERROR_MSG_DATA_VALIDATION_FAIL}
-        assert self.conn.execute('''SELECT * FROM data''').fetchall() == []
-
-    def test_validation_fail_not_list(self):
-        resp = self.app.simulate_post('/shooting_stars', body='{}', headers={'Authorization': 'testpw'})
-        assert resp.status == falcon.HTTP_400
-        assert resp.json == {'title': 'Bad request', 'description': ERROR_MSG_DATA_VALIDATION_FAIL}
-        assert self.conn.execute('''SELECT * FROM data''').fetchall() == []
-
     def test_validation_fail_entry_not_dict(self):
-        resp = self.app.simulate_post('/shooting_stars', body=json.dumps(['fail']), headers={'Authorization': 'testpw'})
+        resp = self.app.simulate_post('/shooting_stars', json=['fail'], headers={'Authorization': 'testpw'})
         assert resp.status == falcon.HTTP_400
         assert resp.json == {'title': 'Bad request', 'description': ERROR_MSG_DATA_VALIDATION_FAIL}
         assert self.conn.execute('''SELECT * FROM data''').fetchall() == []
 
     def test_validation_fail_second_entry_not_dict(self):
-        resp = self.app.simulate_post('/shooting_stars', body=json.dumps([{'test': 'pass'}, 'fail']), headers={'Authorization': 'testpw'})
+        resp = self.app.simulate_post('/shooting_stars', json=[{'test': 'pass'}, 'fail'], headers={'Authorization': 'testpw'})
         assert resp.status == falcon.HTTP_400
         assert resp.json == {'title': 'Bad request', 'description': ERROR_MSG_DATA_VALIDATION_FAIL}
         assert self.conn.execute('''SELECT * FROM data''').fetchall() == []
@@ -425,7 +414,7 @@ class TestShootingStarsResourcePost(TestCase):
             'minTime': FROZEN_UNIX_TIME + 500,
             'maxTime': FROZEN_UNIX_TIME + 1000
         }
-        resp = self.app.simulate_post('/shooting_stars', body=json.dumps([test_data]), headers={'Authorization': 'testpw'})
+        resp = self.app.simulate_post('/shooting_stars', json=[test_data], headers={'Authorization': 'testpw'})
         assert resp.status == falcon.HTTP_400
         assert resp.json == {'title': 'Bad request', 'description': ERROR_MSG_DATA_VALIDATION_FAIL}
         assert self.conn.execute('''SELECT * FROM data''').fetchall() == []
@@ -436,7 +425,7 @@ class TestShootingStarsResourcePost(TestCase):
             'minTime': FROZEN_UNIX_TIME + 500,
             'maxTime': FROZEN_UNIX_TIME + 1000
         }
-        resp = self.app.simulate_post('/shooting_stars', body=json.dumps([test_data]), headers={'Authorization': 'testpw'})
+        resp = self.app.simulate_post('/shooting_stars', json=[test_data], headers={'Authorization': 'testpw'})
         assert resp.status == falcon.HTTP_400
         assert resp.json == {'title': 'Bad request', 'description': ERROR_MSG_DATA_VALIDATION_FAIL}
         assert self.conn.execute('''SELECT * FROM data''').fetchall() == []
@@ -447,7 +436,7 @@ class TestShootingStarsResourcePost(TestCase):
             'world': 302,
             'maxTime': FROZEN_UNIX_TIME + 1000
         }
-        resp = self.app.simulate_post('/shooting_stars', body=json.dumps([test_data]), headers={'Authorization': 'testpw'})
+        resp = self.app.simulate_post('/shooting_stars', json=[test_data], headers={'Authorization': 'testpw'})
         assert resp.status == falcon.HTTP_400
         assert resp.json == {'title': 'Bad request', 'description': ERROR_MSG_DATA_VALIDATION_FAIL}
         assert self.conn.execute('''SELECT * FROM data''').fetchall() == []
@@ -458,7 +447,7 @@ class TestShootingStarsResourcePost(TestCase):
             'world': 302,
             'minTime': FROZEN_UNIX_TIME + 500
         }
-        resp = self.app.simulate_post('/shooting_stars', body=json.dumps([test_data]), headers={'Authorization': 'testpw'})
+        resp = self.app.simulate_post('/shooting_stars', json=[test_data], headers={'Authorization': 'testpw'})
         assert resp.status == falcon.HTTP_400
         assert resp.json == {'title': 'Bad request', 'description': ERROR_MSG_DATA_VALIDATION_FAIL}
         assert self.conn.execute('''SELECT * FROM data''').fetchall() == []
@@ -470,7 +459,7 @@ class TestShootingStarsResourcePost(TestCase):
             'minTime': FROZEN_UNIX_TIME + 500,
             'maxTime': FROZEN_UNIX_TIME + 1000
         }
-        resp = self.app.simulate_post('/shooting_stars', body=json.dumps([test_data]), headers={'Authorization': 'testpw'})
+        resp = self.app.simulate_post('/shooting_stars', json=[test_data], headers={'Authorization': 'testpw'})
         assert resp.status == falcon.HTTP_400
         assert resp.json == {'title': 'Bad request', 'description': ERROR_MSG_DATA_VALIDATION_FAIL}
         assert self.conn.execute('''SELECT * FROM data''').fetchall() == []
@@ -482,7 +471,7 @@ class TestShootingStarsResourcePost(TestCase):
             'minTime': FROZEN_UNIX_TIME + 500,
             'maxTime': FROZEN_UNIX_TIME + 1000
         }
-        resp = self.app.simulate_post('/shooting_stars', body=json.dumps([test_data]), headers={'Authorization': 'testpw'})
+        resp = self.app.simulate_post('/shooting_stars', json=[test_data], headers={'Authorization': 'testpw'})
         assert resp.status == falcon.HTTP_400
         assert resp.json == {'title': 'Bad request', 'description': ERROR_MSG_DATA_VALIDATION_FAIL}
         assert self.conn.execute('''SELECT * FROM data''').fetchall() == []
@@ -494,7 +483,7 @@ class TestShootingStarsResourcePost(TestCase):
             'minTime': f'{FROZEN_UNIX_TIME + 500}',
             'maxTime': FROZEN_UNIX_TIME + 1000
         }
-        resp = self.app.simulate_post('/shooting_stars', body=json.dumps([test_data]), headers={'Authorization': 'testpw'})
+        resp = self.app.simulate_post('/shooting_stars', json=[test_data], headers={'Authorization': 'testpw'})
         assert resp.status == falcon.HTTP_400
         assert resp.json == {'title': 'Bad request', 'description': ERROR_MSG_DATA_VALIDATION_FAIL}
         assert self.conn.execute('''SELECT * FROM data''').fetchall() == []
@@ -506,7 +495,7 @@ class TestShootingStarsResourcePost(TestCase):
             'minTime': FROZEN_UNIX_TIME + 500,
             'maxTime': f'{FROZEN_UNIX_TIME + 1000}'
         }
-        resp = self.app.simulate_post('/shooting_stars', body=json.dumps([test_data]), headers={'Authorization': 'testpw'})
+        resp = self.app.simulate_post('/shooting_stars', json=[test_data], headers={'Authorization': 'testpw'})
         assert resp.status == falcon.HTTP_400
         assert resp.json == {'title': 'Bad request', 'description': ERROR_MSG_DATA_VALIDATION_FAIL}
         assert self.conn.execute('''SELECT * FROM data''').fetchall() == []
@@ -519,7 +508,7 @@ class TestShootingStarsResourcePost(TestCase):
             'maxTime': FROZEN_UNIX_TIME + 1000
         }
 
-        resp = self.app.simulate_post('/shooting_stars', json=json.dumps([test_data]), headers={'Authorization': 'testpw'})
+        resp = self.app.simulate_post('/shooting_stars', json=[test_data], headers={'Authorization': 'testpw'})
         assert resp.status == falcon.HTTP_400
         assert resp.json == {'title': 'Bad request', 'description': ERROR_MSG_DATA_VALIDATION_FAIL}
         assert self.conn.execute('''SELECT * FROM data''').fetchall() == []
@@ -532,7 +521,7 @@ class TestShootingStarsResourcePost(TestCase):
             'maxTime': FROZEN_UNIX_TIME + 1000
         }
 
-        resp = self.app.simulate_post('/shooting_stars', json=json.dumps([test_data]), headers={'Authorization': 'testpw'})
+        resp = self.app.simulate_post('/shooting_stars', json=[test_data], headers={'Authorization': 'testpw'})
         assert resp.status == falcon.HTTP_400
         assert resp.json == {'title': 'Bad request', 'description': ERROR_MSG_DATA_VALIDATION_FAIL}
         assert self.conn.execute('''SELECT * FROM data''').fetchall() == []
@@ -545,7 +534,7 @@ class TestShootingStarsResourcePost(TestCase):
             'maxTime': FROZEN_UNIX_TIME + 1000
         }
 
-        resp = self.app.simulate_post('/shooting_stars', json=json.dumps([test_data]), headers={'Authorization': 'testpw'})
+        resp = self.app.simulate_post('/shooting_stars', json=[test_data], headers={'Authorization': 'testpw'})
         assert resp.status == falcon.HTTP_400
         assert resp.json == {'title': 'Bad request', 'description': ERROR_MSG_DATA_VALIDATION_FAIL}
         assert self.conn.execute('''SELECT * FROM data''').fetchall() == []
@@ -558,7 +547,7 @@ class TestShootingStarsResourcePost(TestCase):
             'maxTime': FROZEN_UNIX_TIME + 1000
         }
 
-        resp = self.app.simulate_post('/shooting_stars', json=json.dumps([test_data]), headers={'Authorization': 'testpw'})
+        resp = self.app.simulate_post('/shooting_stars', json=[test_data], headers={'Authorization': 'testpw'})
         assert resp.status == falcon.HTTP_400
         assert resp.json == {'title': 'Bad request', 'description': ERROR_MSG_DATA_VALIDATION_FAIL}
         assert self.conn.execute('''SELECT * FROM data''').fetchall() == []
@@ -571,7 +560,7 @@ class TestShootingStarsResourcePost(TestCase):
             'maxTime': FROZEN_UNIX_TIME + (60*26) + 1
         }
 
-        resp = self.app.simulate_post('/shooting_stars', json=json.dumps([test_data]), headers={'Authorization': 'testpw'})
+        resp = self.app.simulate_post('/shooting_stars', json=[test_data], headers={'Authorization': 'testpw'})
         assert resp.status == falcon.HTTP_400
         assert resp.json == {'title': 'Bad request', 'description': ERROR_MSG_DATA_VALIDATION_FAIL}
         assert self.conn.execute('''SELECT * FROM data''').fetchall() == []
@@ -584,7 +573,7 @@ class TestShootingStarsResourcePost(TestCase):
             'maxTime': FROZEN_UNIX_TIME
         }
 
-        resp = self.app.simulate_post('/shooting_stars', json=json.dumps([test_data]), headers={'Authorization': 'testpw'})
+        resp = self.app.simulate_post('/shooting_stars', json=[test_data], headers={'Authorization': 'testpw'})
         assert resp.status == falcon.HTTP_400
         assert resp.json == {'title': 'Bad request', 'description': ERROR_MSG_DATA_VALIDATION_FAIL}
         assert self.conn.execute('''SELECT * FROM data''').fetchall() == []
@@ -597,7 +586,7 @@ class TestShootingStarsResourcePost(TestCase):
             'maxTime': FROZEN_UNIX_TIME + (60*150) + 1
         }
 
-        resp = self.app.simulate_post('/shooting_stars', json=json.dumps([test_data]), headers={'Authorization': 'testpw'})
+        resp = self.app.simulate_post('/shooting_stars', json=[test_data], headers={'Authorization': 'testpw'})
         assert resp.status == falcon.HTTP_400
         assert resp.json == {'title': 'Bad request', 'description': ERROR_MSG_DATA_VALIDATION_FAIL}
         assert self.conn.execute('''SELECT * FROM data''').fetchall() == []
@@ -610,7 +599,7 @@ class TestShootingStarsResourcePost(TestCase):
             'maxTime': FROZEN_UNIX_TIME - 50
         }
 
-        resp = self.app.simulate_post('/shooting_stars', json=json.dumps([test_data]), headers={'Authorization': 'testpw'})
+        resp = self.app.simulate_post('/shooting_stars', json=[test_data], headers={'Authorization': 'testpw'})
         assert resp.status == falcon.HTTP_400
         assert resp.json == {'title': 'Bad request', 'description': ERROR_MSG_DATA_VALIDATION_FAIL}
         assert self.conn.execute('''SELECT * FROM data''').fetchall() == []
@@ -803,58 +792,66 @@ class TestPasswordShootingStarsResourceGetWhitelist(TestCase):
 
 
 class TestPasswordShootingStarsResourcePostWhitelist(TestCase):
-    # add something already on the list
-    # add a new pw
+
     def test_simple(self):
-        resp: falcon.testing.Result = self.app.simulate_post('/whitelist', headers={'Authorization': 'masterpw'}, json=json.dumps({'password': 'testpw3'}))
+        resp: falcon.testing.Result = self.app.simulate_post('/whitelist', headers={'Authorization': 'masterpw'}, json={'password': 'testpw3'})
         assert resp.status == falcon.HTTP_200
         assert 'testpw3' in password_based_star_miners.scout_pw_whitelist
         assert 'testpw3' not in password_based_star_miners.master_pw_whitelist
+        rows = self.conn.execute('''SELECT password FROM scout_whitelist WHERE password = "testpw3"''').fetchall()
+        assert len(rows) == 1
         password_based_star_miners.scout_pw_whitelist.discard('testpw3')
 
     def test_already_existing_add(self):
         password_based_star_miners.scout_pw_whitelist.add('testpw3')
-        resp: falcon.testing.Result = self.app.simulate_post('/whitelist', headers={'Authorization': 'masterpw'}, json=json.dumps({'password': 'testpw3'}))
+        resp: falcon.testing.Result = self.app.simulate_post('/whitelist', headers={'Authorization': 'masterpw'}, json={'password': 'testpw3'})
         assert resp.status == falcon.HTTP_200
         assert 'testpw3' in password_based_star_miners.scout_pw_whitelist
         assert 'testpw3' not in password_based_star_miners.master_pw_whitelist
+        rows = self.conn.execute('''SELECT password FROM scout_whitelist WHERE password = "testpw3"''').fetchall()
+        assert len(rows) == 1
         password_based_star_miners.scout_pw_whitelist.discard('testpw3')
 
     def test_validation_no_auth(self):
-        resp: falcon.testing.Result = self.app.simulate_post('/whitelist', json=json.dumps({'password': 'testpw3'}))
+        resp: falcon.testing.Result = self.app.simulate_post('/whitelist', json={'password': 'testpw3'})
         assert resp.status == falcon.HTTP_400
         assert resp.json == {'title': 'Bad request', 'description': ERROR_MSG_AUTHORIZATION_FAIL_SUBMIT}
+        rows = self.conn.execute('''SELECT password FROM scout_whitelist WHERE password = "testpw3"''').fetchall()
+        assert len(rows) == 0
 
     def test_validation_incorrect_auth(self):
-        resp: falcon.testing.Result = self.app.simulate_post('/whitelist', headers={'Authorization': 'badpw'}, json=json.dumps({'password': 'testpw3'}))
+        resp: falcon.testing.Result = self.app.simulate_post('/whitelist', headers={'Authorization': 'badpw'}, json={'password': 'testpw3'})
         assert resp.status == falcon.HTTP_400
         assert resp.json == {'title': 'Bad request', 'description': ERROR_MSG_AUTHORIZATION_FAIL_SUBMIT}
-
-    def test_validation_fail_not_json(self):
-        resp = self.app.simulate_post('/whitelist', body='', headers={'Authorization': 'masterpw'})
-        assert resp.status == falcon.HTTP_400
-        assert resp.json == {'title': 'Bad request', 'description': ERROR_MSG_DATA_VALIDATION_FAIL}
+        rows = self.conn.execute('''SELECT password FROM scout_whitelist WHERE password = "testpw3"''').fetchall()
+        assert len(rows) == 0
 
     def test_validation_fail_missing_password(self):
-        resp = self.app.simulate_post('/whitelist', body='{}', headers={'Authorization': 'masterpw'})
+        resp = self.app.simulate_post('/whitelist', json={}, headers={'Authorization': 'masterpw'})
         assert resp.status == falcon.HTTP_400
         assert resp.json == {'title': 'Bad request', 'description': ERROR_MSG_DATA_VALIDATION_FAIL}
+        rows = self.conn.execute('''SELECT password FROM scout_whitelist WHERE password = "testpw3"''').fetchall()
+        assert len(rows) == 0
 
     def test_validation_fail_password_not_str(self):
-        resp = self.app.simulate_post('/whitelist', body='{"password": 1}', headers={'Authorization': 'masterpw'})
+        resp = self.app.simulate_post('/whitelist', json={"password": 1}, headers={'Authorization': 'masterpw'})
         assert resp.status == falcon.HTTP_400
         assert resp.json == {'title': 'Bad request', 'description': ERROR_MSG_DATA_VALIDATION_FAIL}
+        rows = self.conn.execute('''SELECT password FROM scout_whitelist WHERE password = "testpw3"''').fetchall()
+        assert len(rows) == 0
 
 
 class TestPasswordShootingStarsResourceDeleteWhitelist(TestCase):
 
     def test_simple(self):
-        resp: falcon.testing.Result = self.app.simulate_delete('/whitelist', headers={'Authorization': 'masterpw'}, json=json.dumps({'password': 'testpw2'}))
+        resp: falcon.testing.Result = self.app.simulate_delete('/whitelist', headers={'Authorization': 'masterpw'}, json={'password': 'testpw2'})
 
         assert resp.status == falcon.HTTP_200
         assert 'testpw2' not in password_based_star_miners.scout_pw_whitelist
         assert 'testpw' in password_based_star_miners.scout_pw_whitelist
         assert resp.text == 'Successfully removed from whitelist and data cleared'
+        rows = self.conn.execute('''SELECT password FROM scout_whitelist WHERE password = "testpw2"''').fetchall()
+        assert len(rows) == 0
 
         password_based_star_miners.scout_pw_whitelist.add('testpw2')
 
@@ -866,7 +863,7 @@ class TestPasswordShootingStarsResourceDeleteWhitelist(TestCase):
             'maxTime': FROZEN_UNIX_TIME + 100
         }
         add_data(self.conn, test_data, 'testpw2')
-        resp: falcon.testing.Result = self.app.simulate_delete('/whitelist', headers={'Authorization': 'masterpw'}, json=json.dumps({'password': 'testpw2'}))
+        resp: falcon.testing.Result = self.app.simulate_delete('/whitelist', headers={'Authorization': 'masterpw'}, json={'password': 'testpw2'})
 
         assert resp.status == falcon.HTTP_200
         assert 'testpw2' not in password_based_star_miners.scout_pw_whitelist
@@ -874,38 +871,34 @@ class TestPasswordShootingStarsResourceDeleteWhitelist(TestCase):
         assert resp.text == 'Successfully removed from whitelist and data cleared'
         rows = self.conn.execute('''SELECT * FROM data''').fetchall()
         assert len(rows) == 0
+        rows = self.conn.execute('''SELECT password FROM scout_whitelist WHERE password = "testpw2"''').fetchall()
+        assert len(rows) == 0
 
         password_based_star_miners.scout_pw_whitelist.add('testpw2')
 
     def test_not_in_whitelist(self):
-        resp: falcon.testing.Result = self.app.simulate_delete('/whitelist', headers={'Authorization': 'masterpw'}, json=json.dumps({'password': 'testpw3'}))
-
+        resp: falcon.testing.Result = self.app.simulate_delete('/whitelist', headers={'Authorization': 'masterpw'}, json={'password': 'testpw3'})
         assert resp.status == falcon.HTTP_200
         assert 'testpw2' in password_based_star_miners.scout_pw_whitelist
         assert 'testpw' in password_based_star_miners.scout_pw_whitelist
         assert resp.text == 'No such key found in the whitelist'
 
     def test_validation_no_auth(self):
-        resp: falcon.testing.Result = self.app.simulate_delete('/whitelist', json=json.dumps({'password': 'testpw2'}))
+        resp: falcon.testing.Result = self.app.simulate_delete('/whitelist', json={'password': 'testpw2'})
         assert resp.status == falcon.HTTP_400
         assert resp.json == {'title': 'Bad request', 'description': ERROR_MSG_AUTHORIZATION_FAIL_SUBMIT}
 
     def test_validation_incorrect_auth(self):
-        resp: falcon.testing.Result = self.app.simulate_delete('/whitelist', headers={'Authorization': 'badpw'}, json=json.dumps({'password': 'testpw2'}))
+        resp: falcon.testing.Result = self.app.simulate_delete('/whitelist', headers={'Authorization': 'badpw'}, json={'password': 'testpw2'})
         assert resp.status == falcon.HTTP_400
         assert resp.json == {'title': 'Bad request', 'description': ERROR_MSG_AUTHORIZATION_FAIL_SUBMIT}
 
-    def test_validation_fail_not_json(self):
-        resp = self.app.simulate_delete('/whitelist', body='', headers={'Authorization': 'masterpw'})
-        assert resp.status == falcon.HTTP_400
-        assert resp.json == {'title': 'Bad request', 'description': ERROR_MSG_DATA_VALIDATION_FAIL}
-
     def test_validation_fail_missing_password(self):
-        resp = self.app.simulate_delete('/whitelist', body='{}', headers={'Authorization': 'masterpw'})
+        resp = self.app.simulate_delete('/whitelist', json={}, headers={'Authorization': 'masterpw'})
         assert resp.status == falcon.HTTP_400
         assert resp.json == {'title': 'Bad request', 'description': ERROR_MSG_DATA_VALIDATION_FAIL}
 
     def test_validation_fail_password_not_str(self):
-        resp = self.app.simulate_delete('/whitelist', body='{"password": 1}', headers={'Authorization': 'masterpw'})
+        resp = self.app.simulate_delete('/whitelist', json={"password": 1}, headers={'Authorization': 'masterpw'})
         assert resp.status == falcon.HTTP_400
         assert resp.json == {'title': 'Bad request', 'description': ERROR_MSG_DATA_VALIDATION_FAIL}

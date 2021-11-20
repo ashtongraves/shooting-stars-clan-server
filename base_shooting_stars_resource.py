@@ -17,47 +17,44 @@ def hook_validate_data(req: falcon.request.Request, resp: falcon.response.Respon
     """Take a cursory look at the data to see if anything looks obviously incorrect."""
 
     msg = ERROR_MSG_DATA_VALIDATION_FAIL
-    try:
-        data = json.loads(req.media)
-    except Exception:
-        raise falcon.HTTPBadRequest(title='Bad request', description=msg)
+    data = req.media
+    if data:
+        if not isinstance(data, list):
+            raise falcon.HTTPBadRequest(title='Bad request', description=msg)
+        # Take a peek at each sighting passed in the body
+        for data_obj in data:
+            if not isinstance(data_obj, dict):
+                raise falcon.HTTPBadRequest(title='Bad request', description=msg)
 
-    if not isinstance(data, list):
-        raise falcon.HTTPBadRequest(title='Bad request', description=msg)
-    # Take a peek at each sighting passed in the body
-    for data_obj in data:
-        if not isinstance(data_obj, dict):
-            raise falcon.HTTPBadRequest(title='Bad request', description=msg)
+            # KISS, do not try to be clever here.
+            loc = data_obj.get('location')
+            world = data_obj.get('world')
+            min_time = data_obj.get('minTime')
+            max_time = data_obj.get('maxTime')
 
-        # KISS, do not try to be clever here.
-        loc = data_obj.get('location')
-        world = data_obj.get('world')
-        min_time = data_obj.get('minTime')
-        max_time = data_obj.get('maxTime')
+            # Basic existence checks.
+            if loc is None or not isinstance(loc, int):
+                raise falcon.HTTPBadRequest(title='Bad request', description=msg)
+            if world is None or not isinstance(world, int):
+                raise falcon.HTTPBadRequest(title='Bad request', description=msg)
+            if min_time is None or not isinstance(min_time, int):
+                raise falcon.HTTPBadRequest(title='Bad request', description=msg)
+            if max_time is None or not isinstance(max_time, int):
+                raise falcon.HTTPBadRequest(title='Bad request', description=msg)
 
-        # Basic existence checks.
-        if loc is None or not isinstance(loc, int):
-            raise falcon.HTTPBadRequest(title='Bad request', description=msg)
-        if world is None or not isinstance(world, int):
-            raise falcon.HTTPBadRequest(title='Bad request', description=msg)
-        if min_time is None or not isinstance(min_time, int):
-            raise falcon.HTTPBadRequest(title='Bad request', description=msg)
-        if max_time is None or not isinstance(max_time, int):
-            raise falcon.HTTPBadRequest(title='Bad request', description=msg)
-
-        # Feel free to add any other checks here.
-        if loc not in valid_locs:
-            raise falcon.HTTPBadRequest(title='Bad request', description=msg)
-        if world not in valid_worlds:
-            raise falcon.HTTPBadRequest(title='Bad request', description=msg)
-        if max_time - min_time < 120 or max_time - min_time > 60*26:
-            raise falcon.HTTPBadRequest(title='Bad request', description=msg)
-        if min_time >= max_time:
-            raise falcon.HTTPBadRequest(title='Bad request', description=msg)
-        if max_time > 60*150 + int(time.time()):
-            raise falcon.HTTPBadRequest(title='Bad request', description=msg)
-        if max_time < int(time.time()):
-            raise falcon.HTTPBadRequest(title='Bad request', description=msg)
+            # Feel free to add any other checks here.
+            if loc not in valid_locs:
+                raise falcon.HTTPBadRequest(title='Bad request', description=msg)
+            if world not in valid_worlds:
+                raise falcon.HTTPBadRequest(title='Bad request', description=msg)
+            if max_time - min_time < 120 or max_time - min_time > 60*26:
+                raise falcon.HTTPBadRequest(title='Bad request', description=msg)
+            if min_time >= max_time:
+                raise falcon.HTTPBadRequest(title='Bad request', description=msg)
+            if max_time > 60*150 + int(time.time()):
+                raise falcon.HTTPBadRequest(title='Bad request', description=msg)
+            if max_time < int(time.time()):
+                raise falcon.HTTPBadRequest(title='Bad request', description=msg)
 
 
 def hook_validate_auth(req: falcon.request.Request, resp: falcon.response.Response, resource, params):
@@ -131,8 +128,11 @@ class BaseShootingStarsResource:
         resp.status = falcon.HTTP_200  # This is the default status
         authorization = req.auth
 
+        # Handle the ping case
+        if not req.media:
+            return resp
         # For each sighting, see if we need to insert a new record or update an existing one.
-        data = json.loads(req.media)
+        data = req.media
         for data_obj in data:
             data_obj: dict
             world = data_obj['world']
