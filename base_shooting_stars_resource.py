@@ -26,6 +26,11 @@ def hook_validate_data(req: falcon.request.Request, resp: falcon.response.Respon
             if not isinstance(data_obj, dict):
                 raise falcon.HTTPBadRequest(title='Bad request', description=msg)
 
+            # TODO: Remove this after updating the plugin to fix the breaking change
+            # Supports old plugin's API
+            if data_obj.get('loc'):
+                data_obj['location'] = data_obj['loc']
+
             # KISS, do not try to be clever here.
             loc = data_obj.get('location')
             world = data_obj.get('world')
