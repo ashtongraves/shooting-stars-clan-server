@@ -143,9 +143,9 @@ class PasswordStarMinersResource:
             SELECT location, world, minTime, maxTime, sharedKey
             FROM data
             WHERE
-                maxTime > ? AND maxTime < ? AND sharedKey NOT IN ({','.join('?'*len(master_pw_whitelist))})
+                maxTime > ? AND maxTime < ?
             ORDER BY world
-        """, [lowest_time, highest_time, *master_pw_whitelist]).fetchall()
+        """, [lowest_time, highest_time]).fetchall()
 
         # Put data in json format
         data_blob = []
@@ -155,7 +155,7 @@ class PasswordStarMinersResource:
                 'world': row['world'],
                 'minTime': row['minTime'],
                 'maxTime': row['maxTime'],
-                'password': row['sharedKey']
+                'password': (row['sharedKey'] if row['sharedKey'] not in master_pw_whitelist else 'MASTER PASSWORD')
             }
             data_blob.append(data)
         resp.text = json.dumps(data_blob)

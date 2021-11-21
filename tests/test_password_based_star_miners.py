@@ -624,6 +624,21 @@ class TestPasswordShootingStarsResourceGetSeparate(TestCase):
         assert resp.status == falcon.HTTP_200
         assert resp.json == [correct_response]
 
+    def test_master_pw_data_point(self):
+        test_data = {
+            'location': 10,
+            'world': 302,
+            'minTime': FROZEN_UNIX_TIME - 100,
+            'maxTime': FROZEN_UNIX_TIME + 100
+        }
+        add_data(self.conn, test_data, 'masterpw')
+
+        resp: falcon.testing.Result = self.app.simulate_get('/audit', headers={'Authorization': 'masterpw'})
+        correct_response = test_data.copy()
+        correct_response['password'] = 'MASTER PASSWORD'
+        assert resp.status == falcon.HTTP_200
+        assert resp.json == [correct_response]
+
     def test_multiple_data_points(self):
         test_data = {
             'location': 10,
