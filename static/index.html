@@ -64,7 +64,8 @@
         xmlhttp.setRequestHeader("Authorization", mypass);
         xmlhttp.onreadystatechange = function() {
             if (xmlhttp.readyState === XMLHttpRequest.DONE) {
-                document.getElementById("auditresults").innerHTML = (xmlhttp.responseText);
+                document.getElementById("auditresults").innerHTML = "";
+                JSON.parse(xmlhttp.responseText).forEach((x, i) => document.getElementById("auditresults").innerHTML += JSON.stringify(x));
             }
         }
         xmlhttp.send(null);
