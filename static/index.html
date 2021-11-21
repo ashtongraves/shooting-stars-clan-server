@@ -8,6 +8,10 @@
 <input id="keytochange" type="text" />
 <button type="button" id="addbutton">Add to whitelist</button>
 <button type="button" id="removebutton">Remove from whitelist</button>
+<h2>Whitelist results</h2>
+<button type="button" id="whitelistbutton">Update whitelist results</button>
+<div id="whitelistresults">
+</div>
 <h2>Audit results</h2>
 <button type="button" id="auditbutton">Update audit results</button>
 <div id="auditresults">
@@ -37,6 +41,20 @@
         xmlhttp.setRequestHeader("Authorization", mypass);
         xmlhttp.send(JSON.stringify({"password": text}));
     }
+    function getwhitelist() {
+        var mypass = document.getElementById("passwordbox").value;
+        if (mypass === "")
+            return;
+        var xmlhttp = new XMLHttpRequest();
+        xmlhttp.open("GET", base_url + "whitelist", false);
+        xmlhttp.setRequestHeader("Authorization", mypass);
+        xmlhttp.onreadystatechange = function() {
+            if (xmlhttp.readyState === XMLHttpRequest.DONE) {
+                document.getElementById("whitelistresults").innerHTML = (xmlhttp.responseText);
+            }
+        }
+        xmlhttp.send(null);
+    }
     function getauditlist() {
         var mypass = document.getElementById("passwordbox").value;
         if (mypass === "")
@@ -54,6 +72,7 @@
 
     document.getElementById("addbutton").onclick = addtowhitelist;
     document.getElementById("removebutton").onclick = removefromwhitelist;
+    document.getElementById("whitelistbutton").onclick = getwhitelist;
     document.getElementById("auditbutton").onclick = getauditlist;
 </script>
 </body>
