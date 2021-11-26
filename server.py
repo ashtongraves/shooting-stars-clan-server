@@ -5,7 +5,6 @@ import falcon
 from wsgiref.simple_server import make_server
 
 from base_shooting_stars_resource import BaseShootingStarsResource
-from password_based_star_miners import PasswordStarMinersResource
 
 
 def create_app(conn: sqlite3.Connection, clazz):

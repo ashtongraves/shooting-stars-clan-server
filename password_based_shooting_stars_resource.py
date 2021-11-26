@@ -30,7 +30,7 @@ def hook_validate_whitelist_params(req: falcon.request.Request, resp: falcon.res
         raise falcon.HTTPBadRequest(title='Bad request', description=msg)
 
 
-class PasswordStarMinersResource:
+class PasswordBasedShootingStarsResource:
 
     def __init__(self, path_to_db: sqlite3.Connection):
         self.shooting_stars_resource = BaseShootingStarsResource(path_to_db)
