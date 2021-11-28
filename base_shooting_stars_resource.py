@@ -28,7 +28,7 @@ def hook_validate_data(req: falcon.request.Request, resp: falcon.response.Respon
 
             # TODO: Remove this after updating the plugin to fix the breaking change
             # Supports old plugin's API
-            if data_obj.get('loc'):
+            if data_obj.get('loc') is not None:
                 data_obj['location'] = data_obj['loc']
 
             # KISS, do not try to be clever here.
