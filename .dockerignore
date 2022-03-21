@@ -1,0 +1,6 @@
+__pycache__/
+resources/tests/
+example_admin_page/
+Dockerfile
+LICENSE
+*.md

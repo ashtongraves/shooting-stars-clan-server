@@ -9,7 +9,7 @@ from freezegun import freeze_time
 import server
 
 import setup_db
-from base_shooting_stars_resource import BaseShootingStarsResource
+from resources.stars_resource import StarsResource
 from constants import ERROR_MSG_DATA_VALIDATION_FAIL, ERROR_MSG_AUTHORIZATION_FAIL
 
 FROZEN_UNIX_TIME = 1635422400
@@ -31,7 +31,7 @@ class TestCase(testing.TestCase):
         super(TestCase, self).setUp()
         self.conn = setup_db.create_shared_key_db(PATH_TO_TEST_DB)
         self.conn.row_factory = sqlite3.Row
-        self.app = testing.TestClient(server.create_app(self.conn, BaseShootingStarsResource))
+        self.app = testing.TestClient(server.create_app(self.conn, StarsResource))
 
     def tearDown(self) -> None:
         super(TestCase, self).tearDown()

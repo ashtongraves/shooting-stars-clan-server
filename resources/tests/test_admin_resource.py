@@ -1,39 +1,32 @@
 import os
 import sqlite3
-
 import falcon
 import datetime
-from falcon import testing
-
-from freezegun import freeze_time
-
-import password_based_shooting_stars_resource
-
 import setup_db
+from falcon import testing
+from freezegun import freeze_time
+from resources.admin_resource import AdminResource
 from constants import ERROR_MSG_DATA_VALIDATION_FAIL, ERROR_MSG_AUTHORIZATION_FAIL, ERROR_MSG_AUTHORIZATION_FAIL_SUBMIT
-from password_based_shooting_stars_resource import PasswordBasedShootingStarsResource
 
 FROZEN_UNIX_TIME = 1635422400
 FROZEN_TIME = datetime.datetime.fromtimestamp(FROZEN_UNIX_TIME, tz=datetime.timezone.utc).isoformat()
 PATH_TO_TEST_DB = 'test_db.db'
+admin_resource = set()
 
 
 def create_test_app(conn: sqlite3.Connection):
-    # falcon.App instances are callable WSGI apps
-    # in larger applications the app is created in a separate file
     app = falcon.App()
 
-    # Resources are represented by long-lived class instances
-    shooting_stars_resource = PasswordBasedShootingStarsResource(conn)
-    password_based_shooting_stars_resource.scout_pw_whitelist.add('testpw')
-    password_based_shooting_stars_resource.scout_pw_whitelist.add('testpw2')
-    password_based_shooting_stars_resource.master_pw_whitelist.add('masterpw')
+    admin_resource = AdminResource(conn)
+    admin_resource.scout_pw_whitelist.add('testpw')
+    admin_resource.scout_pw_whitelist.add('testpw2')
+    admin_resource.master_pw_whitelist.add('masterpw')
 
-    app.add_route('/shooting_stars', shooting_stars_resource)
-    app.add_route('/audit', shooting_stars_resource, suffix='separate')
-    app.add_route('/whitelist', shooting_stars_resource, suffix='whitelist')
+    app.add_route('/shooting_stars', admin_resource)
+    app.add_route('/audit', admin_resource, suffix='separate')
+    app.add_route('/whitelist', admin_resource, suffix='whitelist')
     app.add_static_route('/portal', os.environ['STATIC_ASSETS_FOLDER'])
-    return app, shooting_stars_resource
+    return app, admin_resource
 
 
 def add_data(connection, star_data: dict, shared_key: str):
@@ -382,17 +375,17 @@ class TestShootingStarsResourcePost(TestCase):
         assert self.conn.execute('''SELECT * FROM data''').fetchall() == []
 
     def test_validation_fail_non_alpha_auth(self):
-        password_based_shooting_stars_resource.scout_pw_whitelist.add('123456')
+        AdminResource.scout_pw_whitelist.add('123456')
         resp = self.app.simulate_post('/shooting_stars', headers={'Authorization': '123456'})
-        password_based_shooting_stars_resource.scout_pw_whitelist.remove('123456')
+        AdminResource.scout_pw_whitelist.remove('123456')
         assert resp.status == falcon.HTTP_400
         assert resp.json == {'title': 'Bad request', 'description': ERROR_MSG_AUTHORIZATION_FAIL}
         assert self.conn.execute('''SELECT * FROM data''').fetchall() == []
 
     def test_validation_fail_alpha_numeric_auth(self):
-        password_based_shooting_stars_resource.scout_pw_whitelist.add('a1b2c3d4')
+        AdminResource.scout_pw_whitelist.add('a1b2c3d4')
         resp = self.app.simulate_post('/shooting_stars', headers={'Authorization': 'a1b2c3d4'})
-        password_based_shooting_stars_resource.scout_pw_whitelist.remove('a1b2c3d4')
+        AdminResource.scout_pw_whitelist.remove('a1b2c3d4')
         assert resp.status == falcon.HTTP_400
         assert resp.json == {'title': 'Bad request', 'description': ERROR_MSG_AUTHORIZATION_FAIL}
         assert self.conn.execute('''SELECT * FROM data''').fetchall() == []
@@ -765,15 +758,15 @@ class TestPasswordShootingStarsResourceGetSeparate(TestCase):
         assert resp.json == {'title': 'Bad request', 'description': ERROR_MSG_AUTHORIZATION_FAIL_SUBMIT}
 
     def test_validation_allow_non_alpha_auth(self):
-        password_based_shooting_stars_resource.master_pw_whitelist.add('123456')
+        admin_resource.master_pw_whitelist.add('123456')
         resp: falcon.testing.Result = self.app.simulate_get('/audit', headers={'Authorization': '123456'})
-        password_based_shooting_stars_resource.master_pw_whitelist.remove('123456')
+        admin_resource.master_pw_whitelist.remove('123456')
         assert resp.status == falcon.HTTP_200
 
     def test_validation_allow_alpha_numeric_auth(self):
-        password_based_shooting_stars_resource.master_pw_whitelist.add('a1b2c3d4')
+        admin_resource.master_pw_whitelist.add('a1b2c3d4')
         resp: falcon.testing.Result = self.app.simulate_get('/audit', headers={'Authorization': 'a1b2c3d4'})
-        password_based_shooting_stars_resource.master_pw_whitelist.remove('a1b2c3d4')
+        admin_resource.master_pw_whitelist.remove('a1b2c3d4')
         assert resp.status == falcon.HTTP_200
 
 
@@ -787,14 +780,14 @@ class TestPasswordShootingStarsResourceGetWhitelist(TestCase):
         assert 'testpw2' in resp.json
 
     def test_master_password_not_returned(self):
-        password_based_shooting_stars_resource.master_pw_whitelist.add('masterpw')
+        admin_resource.master_pw_whitelist.add('masterpw')
         resp: falcon.testing.Result = self.app.simulate_get('/whitelist', headers={'Authorization': 'masterpw'})
         assert resp.status == falcon.HTTP_200
         assert len(resp.json) == 2
         assert 'testpw' in resp.json
         assert 'testpw2' in resp.json
         assert 'masterpw' not in resp.json
-        password_based_shooting_stars_resource.master_pw_whitelist.remove('masterpw')
+        admin_resource.master_pw_whitelist.remove('masterpw')
 
     def test_validation_no_auth(self):
         resp: falcon.testing.Result = self.app.simulate_get('/whitelist')
@@ -812,21 +805,21 @@ class TestPasswordShootingStarsResourcePostWhitelist(TestCase):
     def test_simple(self):
         resp: falcon.testing.Result = self.app.simulate_post('/whitelist', headers={'Authorization': 'masterpw'}, json={'password': 'testpw3'})
         assert resp.status == falcon.HTTP_200
-        assert 'testpw3' in password_based_shooting_stars_resource.scout_pw_whitelist
-        assert 'testpw3' not in password_based_shooting_stars_resource.master_pw_whitelist
+        assert 'testpw3' in admin_resource.scout_pw_whitelist
+        assert 'testpw3' not in admin_resource.master_pw_whitelist
         rows = self.conn.execute('''SELECT password FROM scout_whitelist WHERE password = "testpw3"''').fetchall()
         assert len(rows) == 1
-        password_based_shooting_stars_resource.scout_pw_whitelist.discard('testpw3')
+        admin_resource.scout_pw_whitelist.discard('testpw3')
 
     def test_already_existing_add(self):
-        password_based_shooting_stars_resource.scout_pw_whitelist.add('testpw3')
+        admin_resource.scout_pw_whitelist.add('testpw3')
         resp: falcon.testing.Result = self.app.simulate_post('/whitelist', headers={'Authorization': 'masterpw'}, json={'password': 'testpw3'})
         assert resp.status == falcon.HTTP_200
-        assert 'testpw3' in password_based_shooting_stars_resource.scout_pw_whitelist
-        assert 'testpw3' not in password_based_shooting_stars_resource.master_pw_whitelist
+        assert 'testpw3' in admin_resource.scout_pw_whitelist
+        assert 'testpw3' not in admin_resource.master_pw_whitelist
         rows = self.conn.execute('''SELECT password FROM scout_whitelist WHERE password = "testpw3"''').fetchall()
         assert len(rows) == 1
-        password_based_shooting_stars_resource.scout_pw_whitelist.discard('testpw3')
+        admin_resource.scout_pw_whitelist.discard('testpw3')
 
     def test_validation_no_auth(self):
         resp: falcon.testing.Result = self.app.simulate_post('/whitelist', json={'password': 'testpw3'})
@@ -863,13 +856,13 @@ class TestPasswordShootingStarsResourceDeleteWhitelist(TestCase):
         resp: falcon.testing.Result = self.app.simulate_delete('/whitelist', headers={'Authorization': 'masterpw'}, json={'password': 'testpw2'})
 
         assert resp.status == falcon.HTTP_200
-        assert 'testpw2' not in password_based_shooting_stars_resource.scout_pw_whitelist
-        assert 'testpw' in password_based_shooting_stars_resource.scout_pw_whitelist
+        assert 'testpw2' not in admin_resource.scout_pw_whitelist
+        assert 'testpw' in admin_resource.scout_pw_whitelist
         assert resp.text == 'Successfully removed from whitelist and data cleared'
         rows = self.conn.execute('''SELECT password FROM scout_whitelist WHERE password = "testpw2"''').fetchall()
         assert len(rows) == 0
 
-        password_based_shooting_stars_resource.scout_pw_whitelist.add('testpw2')
+        admin_resource.scout_pw_whitelist.add('testpw2')
 
     def test_remove_data(self):
         test_data = {
@@ -882,21 +875,21 @@ class TestPasswordShootingStarsResourceDeleteWhitelist(TestCase):
         resp: falcon.testing.Result = self.app.simulate_delete('/whitelist', headers={'Authorization': 'masterpw'}, json={'password': 'testpw2'})
 
         assert resp.status == falcon.HTTP_200
-        assert 'testpw2' not in password_based_shooting_stars_resource.scout_pw_whitelist
-        assert 'testpw' in password_based_shooting_stars_resource.scout_pw_whitelist
+        assert 'testpw2' not in admin_resource.scout_pw_whitelist
+        assert 'testpw' in admin_resource.scout_pw_whitelist
         assert resp.text == 'Successfully removed from whitelist and data cleared'
         rows = self.conn.execute('''SELECT * FROM data''').fetchall()
         assert len(rows) == 0
         rows = self.conn.execute('''SELECT password FROM scout_whitelist WHERE password = "testpw2"''').fetchall()
         assert len(rows) == 0
 
-        password_based_shooting_stars_resource.scout_pw_whitelist.add('testpw2')
+        admin_resource.scout_pw_whitelist.add('testpw2')
 
     def test_not_in_whitelist(self):
         resp: falcon.testing.Result = self.app.simulate_delete('/whitelist', headers={'Authorization': 'masterpw'}, json={'password': 'testpw3'})
         assert resp.status == falcon.HTTP_200
-        assert 'testpw2' in password_based_shooting_stars_resource.scout_pw_whitelist
-        assert 'testpw' in password_based_shooting_stars_resource.scout_pw_whitelist
+        assert 'testpw2' in admin_resource.scout_pw_whitelist
+        assert 'testpw' in admin_resource.scout_pw_whitelist
         assert resp.text == 'No such key found in the whitelist'
 
     def test_validation_no_auth(self):

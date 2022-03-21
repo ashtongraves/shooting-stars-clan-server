@@ -1,44 +1,59 @@
 import os
 import sqlite3
-import sys
 from pathlib import Path
+from constants import VALID_LOCATIONS, VALID_WORLDS, DATABASE_PATH
 
-
-def create_shared_key_db(path_to_db: str, create_whitelists: bool = False) -> sqlite3.Connection:
-    if Path(path_to_db).is_file():
-        delete_db(path_to_db)
-    conn = sqlite3.connect(path_to_db)
-    conn.execute("""CREATE TABLE
-        data(
-            location integer,
-            world integer,
+def init_db(conn: sqlite3.Connection):
+    conn.execute("""CREATE TABLE IF NOT EXISTS
+        settings(
+            admin_password text not null,
+            server_password text not null,
+            date_modified datetime default current_timestamp not null
+        )
+    )""")
+    conn.execute("""INSERT INTO settings(admin_password, server_password)
+        values ('default', 'default')
+    """)
+    conn.execute("""CREATE TABLE IF NOT EXISTS
+        users(
+            id integer primary key autonicrement not null,
+            username text UNIQUE not null,
+        )
+    )""")
+    conn.execute("""CREATE TABLE IF NOT EXISTS
+        groups(
+            id integer primary key autonicrement  not null,
+            name text check(name in ('scout', 'whitelist')) not null,
+            date_modified datetime default current_timestamp not null
+        )
+    )""")
+    conn.execute("""INSERT INTO groups(name)
+        values
+            ('scout'),
+            ('whitelist')
+    """)
+    conn.execute("""CREATE TABLE IF NOT EXISTS
+        group_membership(
+            id integer primary key autoincrement not null,
+            user_id integer not null,
+            group_id integer not null,
+            date_modified datetime default current_timestamp not null
+        )
+    )""")
+    conn.execute("""CREATE TABLE IF NOT EXISTS
+        stars(
+            location integer not null,
+            world integer not null,
             minTime integer,
             maxTime integer,
-            sharedKey text
-        )""")
-    if create_whitelists:
-        conn.execute("""CREATE TABLE
-            scout_whitelist(
-                password text UNIQUE ON CONFLICT IGNORE NOT NULL ON CONFLICT IGNORE
-            )""")
-        conn.execute("""CREATE TABLE
-            master_whitelist(
-                password text UNIQUE ON CONFLICT IGNORE NOT NULL ON CONFLICT IGNORE
-            )""")
+            PRIMARY KEY(location, world)
+    )""")
     conn.commit()
     return conn
 
-
-def delete_db(path_to_db: str) -> None:
-    if not Path(path_to_db).is_file():
-        raise ValueError
-    os.remove(Path(path_to_db))
-
-
 if __name__ == '__main__':
-    if len(sys.argv) == 2 and not Path(sys.argv[1]).exists():
-        create_shared_key_db(sys.argv[1], create_whitelists=True)
-    elif Path(sys.argv[1]).exists():
-        print(f'ERROR: Database already exists at {Path(sys.argv[1])}')
+    if Path(DATABASE_PATH).exists():
+        print(f'ERROR: Database already exists at {Path(DATABASE_PATH)}')
     else:
-        print('Usage: python setup_db.py [PATH_TO_DB_TO_CREATE]')
+        conn = sqlite3.connect(DATABASE_PATH)
+        init_db(conn)

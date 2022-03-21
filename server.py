@@ -1,30 +1,32 @@
 import os
 import sqlite3
-
 import falcon
 from wsgiref.simple_server import make_server
+from resources.stars_resource import StarsResource
+from resources.admin_resource import UserResource
+from resources.admin_resource import GroupResource
+from resources.admin_resource import GroupMemberResource
+from resources.admin_resource import SettingsResource
+from constants import PASSWORD_ENABLED, DATABASE_PATH, PORT
 
-from base_shooting_stars_resource import BaseShootingStarsResource
-
-
-def create_app(conn: sqlite3.Connection, clazz):
-    # falcon.App instances are callable WSGI apps
-    # in larger applications the app is created in a separate file
+def create_server(conn: sqlite3.Connection):
     app = falcon.App()
+    
+    # Create routes
+    app.add_route('/stars', StarsResource(conn))
+    if PASSWORD_ENABLED:
+        app.add_route('/users', UserResource(conn))
+        app.add_route('/groups', GroupResource(conn))
+        app.add_route('/group_members', GroupMemberResource(conn))
+        app.add_route('/settings', SettingsResource(conn))
 
-    # Resources are represented by long-lived class instances
-    shooting_stars_resource = clazz(conn)
-
-    # things will handle all requests to the '/things' URL path
-    app.add_route('/shooting_stars', shooting_stars_resource)
     return app
 
-
 if __name__ == '__main__':
-    server_conn = sqlite3.connect(os.environ['SHOOTING_STARS_DB'])
-    server_conn.row_factory = sqlite3.Row
-    with make_server('', int(os.environ['SHOOTING_STARS_PORT']), create_app(server_conn, BaseShootingStarsResource)) as httpd:
-        print(f'Serving on port {os.environ["SHOOTING_STARS_PORT"]}...')
+    conn = sqlite3.connect(DATABASE_PATH)
+    conn.row_factory = sqlite3.Row
+    with make_server('', PORT, create_server(conn)) as httpd:
+        print(f'Serving on port {PORT}...')
 
         # Serve until process is killed
         httpd.serve_forever()
