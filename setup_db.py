@@ -6,6 +6,7 @@ from constants import VALID_LOCATIONS, VALID_WORLDS, DATABASE_PATH
 def init_db(conn: sqlite3.Connection):
     conn.execute("""CREATE TABLE IF NOT EXISTS
         settings(
+            id integer primary key autonicrement not null,
             admin_password text not null,
             server_password text not null,
             date_modified datetime default current_timestamp not null

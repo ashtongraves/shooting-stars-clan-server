@@ -55,9 +55,8 @@ def hook_validate_data(req: falcon.request.Request, resp: falcon.response.Respon
                 raise falcon.HTTPBadRequest(title='Bad request', description=msg)
 
 
-def hook_validate_password(req: falcon.request.Request, resp: falcon.response.Response, resource, params):
-    password = req.auth
-    if not password:
+def hook_validate_auth(req: falcon.request.Request, resp: falcon.response.Response, resource, params):
+    if not req.auth:
         raise falcon.HTTPBadRequest(title='Bad request', description=ERROR_MSG_AUTHORIZATION_FAIL)
     if len(req.auth) < 1:
         raise falcon.HTTPBadRequest(title='Bad request', description=ERROR_MSG_AUTHORIZATION_FAIL)
