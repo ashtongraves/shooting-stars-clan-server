@@ -1,3 +1,4 @@
 falcon==3.0.1
 bcrypt==3.2.0
 PyJWT==2.3.0
+pyjwt[crypto]==2.3.0
