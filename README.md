@@ -12,7 +12,8 @@ This was designed to work with the Shooting Stars plugin for RuneLite found here
   - Open a terminal or command prompt in the folder you've extracted the code to, and run the following command:
     - docker build -t "shooting-stars-server" .
 ## Step 2: Create a volume 
- 
+- A volume will serve as permanent storage where you will keep your database file. Docker instances are TEMPORARY meaning that whenever you shut down the program, it wipes all data you saved and starts from scratch when it starts up. Volumes will serve as our permanent storage that you can map to your docker instance. You can use the following command:
+  - docker volume create database-volume
 ## Step 3: Run your docker image
 - On your terminal or command prompt, run the following:
   - docker run -p [your host computers port]:[port environment variable] -mount source=[your volume name],target=[your database folder] shooting-stars-server
