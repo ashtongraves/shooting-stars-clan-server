@@ -7,7 +7,6 @@ WORKDIR /var/www/html
 # Handles environment variables
 ENV PORT 80
 ENV DATABASE /var/www/html/database/main.db
-ENV PASSWORD false
 
 # Installs Dependencies
 RUN apt-get update && apt-get install sqlite3

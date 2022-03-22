@@ -28,7 +28,4 @@
 - Default: 80
 ## DATABASE 
 - Full path to your sqlite database file. e.g /my/database/patah/mydatabase.db. NOTE: unless you mount a drive to that file path, your database file will be wiped on program exit.
-- Default: /var/www/html/database/main.db 
-## PASSWORD
-- Boolean variable that determines whether to map the routes for advanced controls like password restrictions and whitelist.
-- Default: false
+- Default: /var/www/html/database/main.db
