@@ -1,6 +1,6 @@
 # About
 This project is a Python and Falcon web server for tracking Shooting Stars in Oldschool Runescape.
-This was designed to work with the Shooting Stars RuneLite program found here: https://github.com/andmcadams/plugin-repo/tree/shooting_stars_plugin
+This was designed to work with the Shooting Stars plugin for RuneLite found here: https://github.com/andmcadams/plugin-repo/tree/shooting_stars_plugin
 
 # Installation Guide:
 ## Prerequisites:
