@@ -1,3 +1,7 @@
+# About
+This project is a Python and Falcon web server for tracking Shooting Stars in Oldschool Runescape.
+This was designed to work with the Shooting Stars RuneLite program found here: https://github.com/andmcadams/plugin-repo/tree/shooting_stars_plugin
+
 # Installation Guide:
 ## Prerequisites:
   - Docker https://docs.docker.com/desktop/
@@ -26,7 +30,8 @@
 # Environment Variables
 ## PORT 
 - What port you want to use for your docker container. NOTE: Only exposes the port within your docker container's network.
-- Must use -p in your docker run command to expose it map it to a port on your computer. You will most likely not need to change this variable.
+- You will most likely not need to change this variable.
+- Must use -p in your docker run command to map it to a port on your computer. 
 - Default: 80
 ## DATABASE 
 - Full path to your sqlite database file. e.g /my/database/patah/mydatabase.db. NOTE: unless you mount a drive to that file path, your database file will be wiped on program exit.
