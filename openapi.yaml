@@ -1,0 +1,322 @@
+---
+openapi: 3.1.0
+info:
+  title: Shooting Stars Server API
+  description: API for Shooting Stars Server
+  contact:
+    name: Andrew McAdams
+    url: https://github.com/andmcadams/shooting-stars-server/issues
+  license:
+    name: BSD-2-Clause License
+    url: https://github.com/andmcadams/shooting-stars-server/blob/master/LICENSE
+  version: 1.0.0
+servers:
+- url: https://virtserver.swaggerhub.com/ashtongraves/shooting-stars-server/1.0.0
+  description: SwaggerHub API Auto Mocking
+paths:
+  /stars:
+    get:
+      summary: retrieves list of shooting stars
+      description: Searches for all shooting stars and filters by group key
+      responses:
+        "200":
+          description: Auth key is valid, user has permission. Returns all stars
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Star'
+        "400":
+          description: Can't find auth
+        "401":
+          description: Reason 1 - Password is invalid<br /> Reason 2 - The user requesting access isn't in the whitelist group
+      security:
+      - BearerAuth: []
+    patch:
+      summary: updates a stars time
+      description: Updates a stars time
+      requestBody:
+        description: Info of star to update
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Star'
+        required: true
+      responses:
+        "200":
+          description: Auth key is valid, succesfully updated
+        "400":
+          description: Reason 1 - Can't find auth<br /> Reason 2 - World or location is not in the acceptable range. (See min and max values of their respective schemas).<br /> Reason 3 - Minimum time is larger than the maximum time
+        "401":
+          description: Reason 1 - Password is invalid<br /> Reason 2 - The user requesting access isn't in the scout group
+      security:
+      - BearerAuth: []
+  /users:
+    get:
+      summary: retrieves list of users
+      description: Gets all users
+      responses:
+        "200":
+          description: Valid password, returns all users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/User'
+        "400":
+          description: Can't find auth
+        "401":
+          description: Invalid password
+      security:
+      - BasicAuth: []
+    post:
+      summary: Inserts a new user
+      description: Inserts a new user
+      requestBody:
+        description: Name of user to create
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/users_body'
+        required: true
+      responses:
+        "200":
+          description: Valid password, returns all users
+        "400":
+          description: Can't find auth
+        "401":
+          description: Invalid password
+      security:
+      - BasicAuth: []
+  /users/:userId:
+    delete:
+      summary: Deletes a user
+      description: Deletes a new user
+      responses:
+        "200":
+          description: Valid password, succesfully added user
+        "400":
+          description: Can't find id
+        "401":
+          description: Invalid password
+      security:
+      - BasicAuth: []
+  /groups:
+    get:
+      summary: retrieves list of groups
+      description: Gets all groups
+      responses:
+        "200":
+          description: Valid password, returns all groups
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Group'
+        "401":
+          description: Invalid password
+      security:
+      - BasicAuth: []
+  /group_members:
+    get:
+      summary: retrieves list of group members
+      description: Gets all group members
+      responses:
+        "200":
+          description: Valid password, returns all group members
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/GroupMember'
+        "400":
+          description: Can't find auth
+        "401":
+          description: Invalid password
+      security:
+      - BasicAuth: []
+    put:
+      summary: Inserts a new user
+      description: Inserts a new user
+      requestBody:
+        description: Name of user to create
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/GroupMember'
+        required: true
+      responses:
+        "200":
+          description: Valid password, succesfully added user
+        "400":
+          description: Request body is malformed, can't find the user_id or group_id
+        "401":
+          description: Invalid password
+      security:
+      - BasicAuth: []
+  /settings:
+    get:
+      summary: retrieves settings
+      description: Currently the only settings are for server and admin passwords
+      responses:
+        "200":
+          description: Auth key is valid, user has permission. Returns all stars
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/inline_response_200'
+        "400":
+          description: Can't find auth
+        "401":
+          description: Invalid admin password
+      security:
+      - BasicAuth: []
+    patch:
+      summary: updates settings
+      description: Updates the passwords
+      requestBody:
+        description: Info of star to update
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/settings_body'
+        required: true
+      responses:
+        "200":
+          description: Password is valid, user has permission. Returns all stars
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Star'
+        "400":
+          description: Reason 1 - Can't find auth<br /> Reason 2 - Password is invalid. Must be at least 8 characters in length
+        "401":
+          description: Password is invalid.
+      security:
+      - BasicAuth: []
+components:
+  schemas:
+    Star:
+      type: object
+      properties:
+        location:
+          maximum: 14
+          minimum: 0
+          type: integer
+          example: 12
+        world:
+          maximum: 581
+          minimum: 301
+          type: integer
+          example: 330
+        minTime:
+          type: integer
+          description: Unix timestamp
+          example: 1647893266
+        maxTime:
+          type: integer
+          description: Unix timestamp
+          example: 1647893325
+    User:
+      required:
+      - date_modified
+      - id
+      - name
+      type: object
+      properties:
+        id:
+          type: integer
+          description: Primary key
+          example: 403
+        username:
+          type: string
+          example: Alvero
+        date_modified:
+          type: string
+          format: date
+    Group:
+      required:
+      - date_modified
+      - id
+      - name
+      type: object
+      properties:
+        id:
+          type: integer
+          description: Primary key
+          example: 289
+        name:
+          type: string
+          description: Name of group
+          example: Scout
+          enum:
+          - scout
+          - whitelist
+        date_modified:
+          type: string
+          format: date
+    GroupMember:
+      required:
+      - date_modified
+      - group_id
+      - id
+      - user_id
+      type: object
+      properties:
+        id:
+          type: integer
+          description: Primary key
+          example: 8599
+        user_id:
+          type: integer
+          description: User foreign key
+          example: 54994
+        group_id:
+          type: integer
+          description: Group foreign key
+          example: 453678
+        date_modified:
+          type: string
+          format: date
+    users_body:
+      properties:
+        name:
+          type: string
+          description: Must be between 1-12 characters and be alphanumeric
+          example: Alvero
+    inline_response_200:
+      type: object
+      properties:
+        server_password:
+          type: string
+          example: Sup3r$eCuRe358
+        admin_password:
+          type: string
+          example: G00dpa$$496
+    settings_body:
+      type: object
+      properties:
+        server_password:
+          type: string
+          example: Sup3r$eCuRe358
+        admin_password:
+          type: string
+          example: G00dpa$$496
+  securitySchemes:
+    BearerAuth:
+      type: http
+      description: Needs to contain username json object. Encrypted with server password.
+      scheme: bearer
+      bearerFormat: JWT
+    BasicAuth:
+      type: http
+      description: Admin password
+      scheme: basic

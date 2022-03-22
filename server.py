@@ -1,4 +1,4 @@
-import os
+import base64
 import sqlite3
 import falcon
 import jwt
@@ -46,18 +46,19 @@ class ValidatePassword:
       results = cur.fetchall()
 
       if len(results) <= 0:
-        raise falcon.HTTPInvalidParam(title='Unauthorized', description=ERROR_MSG_AUTHORIZATION_FAIL)
+        raise falcon.HTTPUnauthorized(title='Unauthorized', description=ERROR_MSG_AUTHORIZATION_FAIL)
     else:
-      password = bcrypt.hashpw(req.auth.strip(), bcrypt.gensalt(14))
+      password = base64.b64decode(req.auth.strip())
+      hashed_password = bcrypt.hashpw(password, bcrypt.gensalt(14))
       cur = conn.cursor()
       cur.execute("""
         select id
         from settings
         where admin_password = ?
-      """, password)
+      """, hashed_password)
       results = cur.fetchall()
       if len(results) <= 0:
-        raise falcon.HTTPInvalidParam(title='Unauthorized', description=ERROR_MSG_AUTHORIZATION_FAIL)
+        raise falcon.HTTPUnauthorized(title='Unauthorized', description=ERROR_MSG_AUTHORIZATION_FAIL)
 
 
 def create_server(conn: sqlite3.Connection):
