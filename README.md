@@ -16,13 +16,13 @@ This was designed to work with the Shooting Stars plugin for RuneLite found here
   - docker volume create database-volume
 ## Step 3: Run your docker image
 - On your terminal or command prompt, run the following:
-  - docker run -p [your host computers port]:[port environment variable] -mount source=[your volume name],target=[your database folder] shooting-stars-server
-    - e.g. docker run -p 8080:80 -mount source=database-volume,target=/var/www/html/database shooting-stars-server
+  - docker run -p [your host computers port]:[port environment variable] --volume [your volume name]:[your database folder] shooting-stars-server
+    - e.g. docker run -p 8080:80 --volume database-volume:/var/www/html/database shooting-stars-server
     - to pass environment variables, you need to use the "-e" flag BEFORE the name of the image for each of your variables you want to set followed by your variable names
-      - e.g. docker run -p 8080:1234 -mount source=database-volume,target=/var/www/html/database -e PORT=1234 -e DATABASE=/database/database.db -e PASSWORD=TRUE shooting-stars-server
-      - e.g. docker run -p 80:80 -mount source=database-volume,target=/var/www/html/database -e DATABASE=/home/username/database/mydata.db shooting-stars-server
+      - e.g. docker run -p 8080:1234 --volume database-volume:/var/www/html/database -e PORT=1234 -e DATABASE=/database/database.db -e PASSWORD=TRUE shooting-stars-server
+      - e.g. docker run -p 80:80 --volume database-volume:/var/www/html/database -e DATABASE=/home/username/database/mydata.db shooting-stars-server
 - If you don't know what you want to use, I'd recommend the following:
-  - docker run -p 80:80 source=database-volume,target=/var/www/html/database shooting-stars-server
+  - docker run -p 80:80 --volume database-volume:/var/www/html/database shooting-stars-server
 
 # Routes
 - Documented in the openapi.yaml file. Can be viewed at https://editor.swagger.io/
