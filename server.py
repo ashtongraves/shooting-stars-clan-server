@@ -3,6 +3,7 @@ import sqlite3
 import falcon
 import jwt
 import bcrypt
+from pathlib import Path
 from wsgiref.simple_server import make_server
 from resources.star_resource import StarResource
 from resources.user_resource import UserResource
@@ -10,10 +11,12 @@ from resources.group_resource import GroupResource
 from resources.group_member_resource import GroupMemberResource
 from resources.settings_resource import SettingsResource
 from constants import DATABASE_PATH, PORT, ERROR_MSG_AUTHORIZATION_FAIL
-from hooks import hook_validate_auth
+from hooks import hook_validate_auth, hook_validate_req_body
+from setup_db import init_db
 conn = set()
 
 class ValidatePassword:
+  @falcon.before(hook_validate_req_body)
   @falcon.before(hook_validate_auth)
   def process_request(self, req, conn):
     if req.path != "/stars":
@@ -75,10 +78,12 @@ def create_server():
     return app
 
 if __name__ == '__main__':
-    conn = sqlite3.connect(DATABASE_PATH)
-    conn.row_factory = sqlite3.Row
-    with make_server('', PORT, create_server()) as httpd:
-        print(f'Serving on port {PORT}...')
+  if not Path(DATABASE_PATH).exists():
+    init_db(conn)
+  conn = sqlite3.connect(DATABASE_PATH)
+  conn.row_factory = sqlite3.Row
+  with make_server('', PORT, create_server()) as httpd:
+      print(f'Serving on port {PORT}...')
 
-        # Serve until process is killed
-        httpd.serve_forever()
+      # Serve until process is killed
+      httpd.serve_forever()

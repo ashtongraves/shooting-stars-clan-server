@@ -15,5 +15,5 @@ RUN pip install -r requirements.txt
 
 # Runs setup scripts and initalizes server
 # Need to use sh -c in order to pass env
-ENTRYPOINT ["sh", "-c", "(python3 setup_db.py ${DATABASE} && python3 server.py)"]
+ENTRYPOINT ["python3", "server.py"]
 EXPOSE $PORT
