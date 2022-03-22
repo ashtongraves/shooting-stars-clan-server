@@ -11,10 +11,11 @@ from resources.group_member_resource import GroupMemberResource
 from resources.settings_resource import SettingsResource
 from constants import DATABASE_PATH, PORT, ERROR_MSG_AUTHORIZATION_FAIL
 from hooks import hook_validate_auth
+conn = set()
 
 class ValidatePassword:
   @falcon.before(hook_validate_auth)
-  def process_request(self, req, resp, conn):
+  def process_request(self, req, conn):
     if req.path != "/stars":
       # Retrieve hashed password
       cur = conn.cursor()
@@ -61,9 +62,8 @@ class ValidatePassword:
         raise falcon.HTTPUnauthorized(title='Unauthorized', description=ERROR_MSG_AUTHORIZATION_FAIL)
 
 
-def create_server(conn: sqlite3.Connection):
+def create_server():
     app = falcon.App()
-    app = falcon.API(middleware=[ValidatePassword(conn)])
 
     # Create routes
     app.add_route('/stars', StarResource(conn))
@@ -77,7 +77,7 @@ def create_server(conn: sqlite3.Connection):
 if __name__ == '__main__':
     conn = sqlite3.connect(DATABASE_PATH)
     conn.row_factory = sqlite3.Row
-    with make_server('', PORT, create_server(conn)) as httpd:
+    with make_server('', PORT, create_server()) as httpd:
         print(f'Serving on port {PORT}...')
 
         # Serve until process is killed
